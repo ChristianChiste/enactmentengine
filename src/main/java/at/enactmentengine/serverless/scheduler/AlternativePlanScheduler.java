@@ -209,8 +209,7 @@ public class AlternativePlanScheduler {
             for (PropertyConstraint property : properties) {
                 if ("resource".equals(property.getName())) { // Found a Function
                     // URL
-                    LOGGER.warn("Function Name:  "+castedToAtomicFunction.getName()+" " +
-                            "Type: "+castedToAtomicFunction.getType()+"  URL: "+property.getValue()+"");
+                    LOGGER.warn("Function Name:  {} Type: {}  URL: {}", castedToAtomicFunction.getName(), castedToAtomicFunction.getType(), property.getValue());
                     listToSaveTo.add(castedToAtomicFunction);
                 }
             }

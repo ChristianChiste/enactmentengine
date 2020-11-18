@@ -1,6 +1,7 @@
 package at.enactmentengine.serverless.main;
 
 import at.enactmentengine.serverless.nodes.ExecutableWorkflow;
+
 import at.enactmentengine.serverless.parser.Language;
 import at.enactmentengine.serverless.parser.YAMLParser;
 import com.google.gson.Gson;
@@ -13,6 +14,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.net.Socket;
 
 /**
  * Main class of enactment engine which specifies the workflowInput file and starts the
@@ -48,7 +50,8 @@ class Executor {
      * @param executionId   the unique identifier for each execution.
      * @return the result of the workflow.
      */
-    Map<String, Object> executeWorkflow(String workflow, String workflowInput, int executionId) {
+    Map<String, Object> executeWorkflow(String workflow, String workflowInput, int executionId, Socket socket) {
+    	
         Map<String, Object> workflowResult = null;
 
         try {
@@ -56,7 +59,8 @@ class Executor {
             workflowResult = executeWorkflow(
                     workflow == null ? null : FileUtils.readFileToByteArray(new File(workflow)),
                     workflowInput == null ? null : FileUtils.readFileToByteArray(new File(workflowInput)),
-                    executionId);
+                    executionId,
+                    socket);
         } catch (IOException e) {
             LOGGER.error(e.getMessage(), e);
         }
@@ -72,7 +76,7 @@ class Executor {
      * @param executionId   the unique identifier for each execution.
      * @return the result of the workflow.
      */
-    Map<String, Object> executeWorkflow(byte[] workflow, byte[] workflowInput, int executionId) {
+    Map<String, Object> executeWorkflow(byte[] workflow, byte[] workflowInput, int executionId, Socket socket) {
 
         /* Measure start time of the workflow execution */
         long start = System.currentTimeMillis();
@@ -88,7 +92,8 @@ class Executor {
         }
 
         /* Create an executable workflow */
-        ExecutableWorkflow ex = new YAMLParser().parseExecutableWorkflow(workflow, Language.YAML, executionId);
+        ExecutableWorkflow ex = new YAMLParser().parseExecutableWorkflow(workflow, Language.YAML, executionId, socket);
+        
 
         /* Create variable to store workflow output */
         Map<String, Object> workflowOutput = null;

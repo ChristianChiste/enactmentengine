@@ -91,6 +91,7 @@ public class ExecutableWorkflow {
 
                     /* Add the actual input to the list of actually present inputs */
                     presentInput.put(workflowName + "/" + data.getName(), input.get(data.getSource()));
+                    //logger.info("input: \"{}\" {}", workflowName + "/" + data.getName(),input.get(data.getSource()));
                 } else {
                     /* The expected input is not present */
                     throw new MissingInputDataException(workflowName + " needs more input data: " + data.getSource());
@@ -134,9 +135,7 @@ public class ExecutableWorkflow {
         return endNode.getResult();
     }
 
-    /**
-     * Getter ans Setter
-     */
+    /** Getter ans Setter */
 
     public Node getStartNode() {
         return startNode;

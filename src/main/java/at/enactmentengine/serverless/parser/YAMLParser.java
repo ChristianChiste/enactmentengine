@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.Socket;
 
 /**
  * Class for parsing YAML files into an executable workflow.
@@ -27,7 +28,7 @@ public class YAMLParser {
      * @param filename yaml file to parse
      * @return Instance of class Executable workflow.
      */
-    public ExecutableWorkflow parseExecutableWorkflow(byte[] filename, Language language, int executionId) {
+    public ExecutableWorkflow parseExecutableWorkflow(byte[] filename, Language language, int executionId, Socket socket) {
 
         // Parse yaml file
         at.uibk.dps.afcl.Workflow workflow = null;
@@ -46,8 +47,9 @@ public class YAMLParser {
         }
 
 
-        return getExecutableWorkflow(workflow, executionId);
+        return getExecutableWorkflow(workflow, executionId, socket);
     }
+    
 
     /**
      * Parses a given JSON string to a workflow, which can be executed.
@@ -73,7 +75,7 @@ public class YAMLParser {
             throw new NotImplementedException("Workflow language currently not supported.");
         }
 
-        return getExecutableWorkflow(workflow, executionId);
+        return getExecutableWorkflow(workflow, executionId, null);
     }
 
     /**
@@ -82,12 +84,13 @@ public class YAMLParser {
      * @param workflow to convert
      * @return executable workflow
      */
-    public ExecutableWorkflow getExecutableWorkflow(at.uibk.dps.afcl.Workflow workflow, int executionId) {
+    public ExecutableWorkflow getExecutableWorkflow(at.uibk.dps.afcl.Workflow workflow, int executionId, Socket socket) {
 
         ExecutableWorkflow executableWorkflow = null;
         if (workflow != null) {
             NodeListHelper nodeListHelper = new NodeListHelper();
             nodeListHelper.executionId = executionId;
+            nodeListHelper.socket=socket; //for having the socket connection afterwards in every FunctionNode to communicate with scheduler
 
             // Create node pairs from workflow functions
             ListPair<Node, Node> workflowPair = new ListPair<>();

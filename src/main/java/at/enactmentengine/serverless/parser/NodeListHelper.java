@@ -6,6 +6,7 @@ import at.uibk.dps.afcl.functions.objects.Case;
 import at.uibk.dps.afcl.functions.objects.Section;
 import at.uibk.dps.afcl.Function;
 import org.apache.commons.lang3.NotImplementedException;
+import java.net.Socket;
 
 /**
  * Helper class to create NodeLists out of function constructs
@@ -15,6 +16,8 @@ import org.apache.commons.lang3.NotImplementedException;
 class NodeListHelper {
 
     int executionId;
+    
+    Socket socket;
 
     /**
      * Default constructor for NodeList helper
@@ -32,7 +35,7 @@ class NodeListHelper {
     ListPair<Node, Node> toNodeList(Function function) {
         if (function instanceof AtomicFunction) {
             AtomicFunction tmp = (AtomicFunction) function;
-            FunctionNode functionNode = new FunctionNode(tmp.getName(), tmp.getType(), tmp.getProperties(), tmp.getConstraints(), tmp.getDataIns(), tmp.getDataOuts(), executionId);
+            FunctionNode functionNode = new FunctionNode(tmp.getName(), tmp.getType(), tmp.getProperties(), tmp.getConstraints(), tmp.getDataIns(), tmp.getDataOuts(), executionId, socket);
             return new ListPair<>(functionNode, functionNode);
         } else if (function instanceof IfThenElse) {
             return toNodeListIf((IfThenElse) function);

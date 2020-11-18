@@ -1,16 +1,18 @@
 package at.enactmentengine.serverless.main;
 
-import at.enactmentengine.serverless.exception.MissingInputDataException;
 import at.enactmentengine.serverless.nodes.ExecutableWorkflow;
 import at.enactmentengine.serverless.parser.Language;
 import at.enactmentengine.serverless.parser.YAMLParser;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 /**
  * LambdaHandler to allow the execution of the Enactment Engine as Lambda
@@ -22,51 +24,64 @@ import java.util.concurrent.ExecutionException;
 
 public class LambdaHandler implements RequestHandler<LambdaHandler.InputObject, String> {
 
-    /**
-     * Logger for lambda handler.
-     */
     private static final Logger logger = LoggerFactory.getLogger(LambdaHandler.class);
 
-    /**
-     * Starting point of the lambda handler function.
-     *
-     * @param inputObject request for the enactment-engine.
-     * @param context of the lambda function.
-     * @return json result.
-     */
     @Override
     public String handleRequest(InputObject inputObject, Context context) {
+        long startTime = System.currentTimeMillis();
 
-        /* Start measuring time for workflow execution */
-        long start = System.currentTimeMillis();
+        ExecutableWorkflow ex = null;
 
-        int executionId = -1;
-        Map<String, Object> executionResult = null;
+        // Set workflow language
         Language language = readLanguage(inputObject);
 
-        if(inputObject != null) {
-            if(inputObject.getWorkflow() != null){
-
-                /* Parse the workflow */
-                ExecutableWorkflow ex = new YAMLParser().parseExecutableWorkflowByStringContent(inputObject.getWorkflow(), language, executionId);
-                try {
-                    /* Execute the workflow */
-                    executionResult = ex.executeWorkflow(inputObject.getInput());
-                } catch (MissingInputDataException | ExecutionException | InterruptedException e) {
-                    e.printStackTrace();
-                }
-            } else {
-                return "{\"result\": \"Error: Could not run workflow. Request not valid.\"}";
+        // Check if input is valid
+        if (inputObject == null || /*inputObject.getBucketName() == null ||*/ inputObject.getFilename() == null) {
+            if (inputObject == null || inputObject.getWorkflow() == null) {
+                return "{\"result\": \"Error: Could not run workflow. Input not valid.\"}";
             }
+
+            // Parse and create executable workflow
+            ex = new YAMLParser().parseExecutableWorkflowByStringContent(inputObject.getWorkflow(), language, -1);
         } else {
-            return "{\"result\": \"Error: Could not run workflow. Request not specified.\"}";
+
+            // Parse and create executable workflow
+            try {
+                ex = new YAMLParser().parseExecutableWorkflow(FileUtils.readFileToByteArray(new File(inputObject.getFilename())), language, -1, null);
+            } catch (IOException e) {
+                logger.error(e.getMessage(), e);
+            }
         }
 
-        /* Stop measuring time for workflow execution */
-        long end = System.currentTimeMillis();
+        // Check if conversion to an executable workflow succeeded
+        if (ex != null) {
 
-        return "{\"logs\": \"Workflow ran without errors in " + (end - start) + "ms. Start: " + start + ", End: " + end + "\"," +
-                "\"result\": \"" + executionResult + "\"}";
+            // Set the workflow input
+            Map<String, Object> input = new HashMap<>();
+            input.put("some source", "34477227772222299999");// for ref gate
+            //input.put("some source", "10");// for anomaly
+            input.put("some camera source", "0");
+            input.put("some sensor source", "0");
+
+            // Add params from EE call as input
+            if (inputObject.getParams() != null) {
+                inputObject.getParams().forEach(input::put);
+            }
+
+            // Execute workflow
+            try {
+                ex.executeWorkflow(input);
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+                return "{\"result\": \"Error: Could not run workflow. See logs for more details.\"}";
+            }
+        } else {
+            return "{\"result\": \"Error: Could not convert to executable workflow.\"}";
+        }
+
+        long endTime = System.currentTimeMillis();
+
+        return "{\"result\": \"Workflow ran without errors in " + (endTime - startTime) + "ms. Start: " + startTime + ", End: " + endTime + "\"}";
     }
 
     /**
@@ -92,42 +107,22 @@ public class LambdaHandler implements RequestHandler<LambdaHandler.InputObject, 
      */
     public static class InputObject {
 
-        /**
-         * Log the execution.
-         */
-        private boolean logResult;
-
-        /**
-         * Filename of the workflow
-         */
+        // Filename of the workflow
         private String filename;
 
-        /**
-         * Potential bucket where the file is stored
-         */
+        // Potential bucket where the file is stored
         private String bucketName;
 
-        /**
-         * Additional parameters
-         */
+        // Additional parameters
         private Map<String, String> params;
 
-        /**
-         * Workflow as JSON
-         */
+        // Workflow as JSON
         private String workflow;
 
-        /**
-         * Workflow input as JSON
-         */
-        private Map<String, Object> input;
-
-        /**
-         * Workflow language (JSON, YAML)
-         */
+        // Workflow language (JSON, YAML)
         private String language;
 
-        /**
+        /*
          * Getter and Setter
          */
 
@@ -170,14 +165,6 @@ public class LambdaHandler implements RequestHandler<LambdaHandler.InputObject, 
         public void setLanguage(String language) {
             this.language = language;
         }
-
-        public Map<String, Object> getInput() { return input; }
-
-        public void setInput(Map<String, Object> input) { this.input = input; }
-
-        public boolean isLogResult() { return logResult; }
-
-        public void setLogResult(boolean logResult) { this.logResult = logResult; }
 
         @Override
         public String toString() {

@@ -4,7 +4,6 @@ import at.enactmentengine.serverless.exception.MissingInputDataException;
 import at.enactmentengine.serverless.exception.MissingResourceLinkException;
 import at.enactmentengine.serverless.main.LambdaHandler;
 import at.enactmentengine.serverless.main.Local;
-import at.enactmentengine.serverless.object.Utils;
 import at.uibk.dps.*;
 import at.uibk.dps.afcl.functions.objects.DataIns;
 import at.uibk.dps.afcl.functions.objects.DataOutsAtomic;
@@ -30,6 +29,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.Socket;
+import at.uibk.dps.communication.*;
+import at.uibk.dps.SocketUtils;
+import at.uibk.dps.communication.entity.Statistics;
 import java.sql.Timestamp;
 import java.util.*;
 
@@ -42,78 +44,35 @@ import java.util.*;
  */
 public class FunctionNode extends Node {
 
-    /**
-     * Logger for the a function node.
-     */
+    public static boolean logResults = true;
+
     private static final Logger logger = LoggerFactory.getLogger(FunctionNode.class);
 
-    /**
-     * The number of executed functions.
-     */
     private static int counter = 0;
-
-    /**
-     * The execution id of the workflow (needed to log the execution).
-     */
     private int executionId;
 
-    /**
-     * The constraints for the function node.
-     */
     private List<PropertyConstraint> constraints;
-
-    /**
-     * The properties of the function node.
-     */
     private List<PropertyConstraint> properties;
-
-    /**
-     * Output of the function node.
-     */
     private List<DataOutsAtomic> output;
-
-    /**
-     * Input to the function node.
-     */
     private List<DataIns> input;
-
-    /**
-     * The invoker for the cloud functions.
-     */
-    private static Gateway gateway = new Gateway(Utils.PATH_TO_CREDENTIALS);
-
-    /**
-     * The result of the function node.
-     */
+    private static Gateway gateway = new Gateway("credentials.properties");
     private Map<String, Object> result;
+    private Socket socket;
 
-    /**
-     * The protocol for the http requests.
-     */
-    private static final String PROTOCOL = "https://";
+	private static final String PROTOCOL = "https://";
 
-    /**
-     * Constructor for a function node.
-     *
-     * @param name of the base function.
-     * @param type of the base function (fType).
-     * @param properties of the base function.
-     * @param constraints of the base function.
-     * @param input to the base function.
-     * @param output of the base function.
-     * @param executionId for the logging of the execution.
-     */
     public FunctionNode(String name, String type, List<PropertyConstraint> properties,
-                        List<PropertyConstraint> constraints, List<DataIns> input, List<DataOutsAtomic> output, int executionId) {
+                        List<PropertyConstraint> constraints, List<DataIns> input, List<DataOutsAtomic> output, int executionId, Socket socket) {
         super(name, type);
         this.output = output;
+        if (output == null) {
+            this.output = new ArrayList<>();
+        }
         this.properties = properties;
         this.constraints = constraints;
         this.input = input;
         this.executionId = executionId;
-        if (output == null) {
-            this.output = new ArrayList<>();
-        }
+        this.socket = socket;
     }
 
     /**
@@ -122,78 +81,73 @@ public class FunctionNode extends Node {
     @Override
     public Boolean call() throws Exception {
 
-        /* The identifier for the current function */
         int id;
         synchronized (this) {
             id = counter++;
         }
 
-        /* Read the resource link of the base function */
+        Map<String, Object> outVals = new HashMap<>();
         String resourceLink = getResourceLink();
-        logger.info("Executing function " + name + " at resource: " + resourceLink + " [" + System.currentTimeMillis() + "ms], id=" + id);
+        logger.info("Executing function {} at resource: {} [{}ms], id={}", name, resourceLink, System.currentTimeMillis(), id);
 
-        /* Actual values of the function input */
-        Map<String, Object> actualFunctionInputs = new HashMap<>();
-
-        /* Output values of the base function */
-        Map<String, Object> functionOutputs = new HashMap<>();
-
+        // Check if all input data is sent by last node and create an input map
+        Map<String, Object> functionInputs = new HashMap<>();
         try {
-            /* Check if an input is specified*/
             if (input != null) {
-
-                /* Iterate over all specified inputs */
                 for (DataIns data : input) {
-
-                    /* Check if actual data contains the specified source */
-                    if (dataValues.containsKey(data.getSource())) {
-
-                        /* Check if the element should be passed to the output */
-                        if (data.getPassing() != null && data.getPassing()) {
-                            functionOutputs.put(name + "/" + data.getName(), dataValues.get(data.getSource()));
-                        } else {
-                            actualFunctionInputs.put(data.getName(), dataValues.get(data.getSource()));
-                        }
-                    } else {
+                    if (!dataValues.containsKey(data.getSource())) {
                         throw new MissingInputDataException(FunctionNode.class.getCanonicalName() + ": " + name
-                                + " needs " + data.getSource() + " !");
+                                + " needs " + data.getSource() + "!");
+                    } else {
+                        if (data.getPassing() != null && data.getPassing()) {
+                            outVals.put(name + "/" + data.getName(), dataValues.get(data.getSource()));
+                        } else {
+                            functionInputs.put(data.getName(), dataValues.get(data.getSource()));
+                        }
                     }
                 }
             }
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return false;
         }
 
-        /* Simulate Availability if specified */
-        if(Utils.SIMULATE_AVAILABILITY) {
+        //Simulate Availability
+        if(logResults){
             SQLLiteDatabase db = new SQLLiteDatabase("jdbc:sqlite:Database/FTDatabase.db");
             double simAvail = db.getSimulatedAvail(resourceLink);
-            actualFunctionInputs = checkFunctionSimAvail(simAvail, actualFunctionInputs);
+            functionInputs = checkFunctionSimAvail(simAvail, functionInputs);
         }
 
-        logFunctionInput(actualFunctionInputs, id);
+        logFunctionInput(functionInputs, id);
 
-        Function functionToInvoke = parseNodeFunction(resourceLink, actualFunctionInputs);
+        Function functionToInvoke = parseNodeFunction(resourceLink, functionInputs);
 
         long start = System.currentTimeMillis();
-        String resultString = invokeFunction(functionToInvoke, resourceLink, actualFunctionInputs);
+        String resultString = invokeFunction(functionToInvoke, resourceLink, functionInputs);
         long end = System.currentTimeMillis();
+        
+        //using null as the workflowResult, so that the scheduler knows the workflow is not over yet
+        EnactmentEngineResponse response = new EnactmentEngineResponse(
+        		null,
+                executionId,
+                new Statistics(new Timestamp(start + TimeZone.getTimeZone("Europe/Rome").getOffset(start)), new Timestamp(end + TimeZone.getTimeZone("Europe/Rome").getOffset(start)))
+        );
+        SocketUtils.sendJsonObject(socket, response);
 
         logFunctionOutput(start, end, resultString, id);
 
-        getValuesParsed(resultString, functionOutputs);
+        getValuesParsed(resultString, outVals);
         for (Node node : children) {
-            node.passResult(functionOutputs);
+            node.passResult(outVals);
             node.call();
         }
-        result = functionOutputs;
+        result = outVals;
 
         String[] providerRegion = getProviderAndRegion(resourceLink);
 
         String status = checkResultSuccess(resultString);
 
-        if(executionId != -1) {
+        if(logResults) {
             Invocation functionInvocation = new Invocation(
                     resourceLink,
                     providerRegion[0],
@@ -207,6 +161,7 @@ public class FunctionNode extends Node {
             );
             logFunctionInvocation(functionInvocation);
         }
+        
         return true;
     }
 
@@ -233,9 +188,9 @@ public class FunctionNode extends Node {
 
     private void logFunctionOutput(long start, long end, String resultString, int id) {
         if (resultString.length() > 100000) {
-            logger.info("Function took: "+(end - start)+" ms. Result: too large ["+System.currentTimeMillis()+"ms], id="+id+"");
+            logger.info("Function took: {} ms. Result: too large [{}ms], id={}", (end - start), System.currentTimeMillis(), id);
         } else {
-            logger.info("Function took: "+(end - start)+" ms. Result: "+name+" : "+resultString+" ["+System.currentTimeMillis()+"ms], id="+id+"");
+            logger.info("Function took: {} ms. Result: {} : {} [{}ms], id={}", (end - start), name, resultString, System.currentTimeMillis(), id);
         }
     }
 
@@ -260,7 +215,7 @@ public class FunctionNode extends Node {
         if (functionInputs.size() > 20) {
             logger.info("Input for function is large [{}ms], id={}", System.currentTimeMillis(), id);
         } else {
-            logger.info("Input for function " + name + " : " + functionInputs + " [" + System.currentTimeMillis() + "ms], id=" + id + "");
+            logger.info("Input for function {} : {} [{}ms], id={}", name, functionInputs, System.currentTimeMillis(), id);
         }
     }
 

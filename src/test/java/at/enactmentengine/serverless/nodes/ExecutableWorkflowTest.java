@@ -22,7 +22,7 @@ public class ExecutableWorkflowTest {
 
         /* Read a workflow and parse to an executable workflow */
         ExecutableWorkflow executableWorkflow = new YAMLParser().parseExecutableWorkflow(
-                FileUtils.readFileToByteArray(new File("src/test/resources/simpleWorkflow.yaml")), Language.YAML, 0);
+                FileUtils.readFileToByteArray(new File("src/test/resources/simpleWorkflow.yaml")), Language.YAML, 0, null);
 
         /* Execute workflow with missing input data */
         executableWorkflow.executeWorkflow(null);
