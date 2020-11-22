@@ -1,7 +1,6 @@
 package at.enactmentengine.serverless.main;
 
 import at.enactmentengine.serverless.nodes.ExecutableWorkflow;
-
 import at.enactmentengine.serverless.parser.Language;
 import at.enactmentengine.serverless.parser.YAMLParser;
 import com.google.gson.Gson;
@@ -15,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.net.Socket;
+
 
 /**
  * Main class of enactment engine which specifies the workflowInput file and starts the
@@ -51,7 +51,6 @@ class Executor {
      * @return the result of the workflow.
      */
     Map<String, Object> executeWorkflow(String workflow, String workflowInput, int executionId, Socket socket) {
-    	
         Map<String, Object> workflowResult = null;
 
         try {
@@ -93,7 +92,6 @@ class Executor {
 
         /* Create an executable workflow */
         ExecutableWorkflow ex = new YAMLParser().parseExecutableWorkflow(workflow, Language.YAML, executionId, socket);
-        
 
         /* Create variable to store workflow output */
         Map<String, Object> workflowOutput = null;

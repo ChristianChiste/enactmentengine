@@ -1,6 +1,5 @@
 package at.enactmentengine.serverless.main;
 
-import at.enactmentengine.serverless.nodes.FunctionNode;
 import at.uibk.dps.NetworkConstants;
 import at.uibk.dps.SocketUtils;
 import at.uibk.dps.communication.*;
@@ -59,7 +58,6 @@ public class Handler implements Runnable {
                 /* Get the execution id of the workflow execution */
                 executionId = getExecutionId();
             }
-            FunctionNode.logResults = enactmentEngineRequest.isLogResults();
 
             /* Execute the workflow */
             Executor executor = new Executor();
@@ -82,7 +80,6 @@ public class Handler implements Runnable {
             /* Send back json string because other modules might not have GSON */
             LOGGER.log(Level.INFO, "Sending back result");
 
-            
             /* Send response back to client */
             SocketUtils.sendJsonObject(socket, response);
 

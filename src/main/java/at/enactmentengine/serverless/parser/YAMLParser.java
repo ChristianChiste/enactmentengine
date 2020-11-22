@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.Socket;
 
+
 /**
  * Class for parsing YAML files into an executable workflow.
  *
@@ -49,7 +50,6 @@ public class YAMLParser {
 
         return getExecutableWorkflow(workflow, executionId, socket);
     }
-    
 
     /**
      * Parses a given JSON string to a workflow, which can be executed.
@@ -90,7 +90,7 @@ public class YAMLParser {
         if (workflow != null) {
             NodeListHelper nodeListHelper = new NodeListHelper();
             nodeListHelper.executionId = executionId;
-            nodeListHelper.socket=socket; //for having the socket connection afterwards in every FunctionNode to communicate with scheduler
+            nodeListHelper.socket = socket; //for having the socket connection afterwards in every FunctionNode to communicate with scheduler
 
             // Create node pairs from workflow functions
             ListPair<Node, Node> workflowPair = new ListPair<>();
